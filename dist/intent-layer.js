@@ -1,0 +1,353 @@
+class v {
+  constructor(t) {
+    this.handlers = /* @__PURE__ */ new Map(), this.sessionId = t;
+  }
+  on(t, e) {
+    this.handlers.has(t) || this.handlers.set(t, /* @__PURE__ */ new Set()), this.handlers.get(t).add(e);
+  }
+  off(t, e) {
+    this.handlers.get(t)?.delete(e);
+  }
+  emit(t, e) {
+    const i = {
+      sessionId: this.sessionId,
+      timestamp: performance.now(),
+      type: t,
+      url: typeof location < "u" ? location.pathname : "",
+      data: e
+    };
+    this.handlers.get(t)?.forEach((s) => {
+      try {
+        s(i);
+      } catch {
+      }
+    });
+  }
+  updateSession(t) {
+    this.sessionId = t;
+  }
+}
+class b {
+  constructor(t = {}) {
+    this.sessionId = "", this.createdAt = 0, this.rotationMs = t.rotationMs ?? 864e5, this.rotate();
+  }
+  getSessionId() {
+    return Date.now() - this.createdAt >= this.rotationMs && this.rotate(), this.sessionId;
+  }
+  rotate() {
+    this.sessionId = this.generateId(), this.createdAt = Date.now();
+  }
+  generateId() {
+    const t = new Uint8Array(8);
+    if (typeof crypto < "u" && crypto.getRandomValues)
+      crypto.getRandomValues(t);
+    else
+      for (let e = 0; e < 8; e++)
+        t[e] = Math.floor(Math.random() * 256);
+    return Array.from(t).map((e) => e.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  }
+}
+class T {
+  constructor(t = {}) {
+    this.respectDNT = t.respectDNT ?? !0;
+  }
+  canTrack() {
+    return this.respectDNT ? (typeof navigator < "u" ? navigator.doNotTrack : null) !== "1" : !0;
+  }
+}
+class S {
+  constructor(t = {}) {
+    this.queue = [], this.maxSize = t.maxSize ?? 100;
+  }
+  push(t) {
+    this.queue.push(t), this.queue.length > this.maxSize && this.queue.shift();
+  }
+  flush() {
+    const t = this.queue;
+    return this.queue = [], t;
+  }
+  get size() {
+    return this.queue.length;
+  }
+}
+class w {
+  constructor(t) {
+    this.endpoint = t.endpoint;
+  }
+  send(t) {
+    if (!this.endpoint || t.length === 0) return !1;
+    const e = {
+      events: t,
+      sessionId: t[0]?.sessionId ?? "",
+      url: t[0]?.url ?? "",
+      sentAt: Date.now()
+    }, i = JSON.stringify(e);
+    return typeof navigator < "u" && navigator.sendBeacon ? navigator.sendBeacon(this.endpoint, i) : typeof fetch < "u" ? (fetch(this.endpoint, {
+      method: "POST",
+      body: i,
+      headers: { "Content-Type": "application/json" },
+      keepalive: !0
+    }).catch(() => {
+    }), !0) : !1;
+  }
+}
+class y {
+  constructor(t) {
+    this.enabled = t.enabled;
+  }
+  send(t) {
+    if (this.enabled)
+      for (const e of t)
+        console.log(
+          `[IntentLayer] ${e.type}`,
+          e.data,
+          `sessionId=${e.sessionId.slice(0, 8)}…`
+        );
+  }
+}
+class M {
+  constructor() {
+    this.type = "pointer", this.emit = null, this.lastX = 0, this.lastY = 0, this.lastTime = 0, this.throttleTimer = null, this.bound = !1, this.onMouseMove = (t) => {
+      if (!this.emit || this.throttleTimer) return;
+      this.throttleTimer = setTimeout(() => {
+        this.throttleTimer = null;
+      }, 150);
+      const e = performance.now(), i = t.clientX, s = t.clientY, n = this.lastTime > 0 ? e - this.lastTime : 16.67, o = i - this.lastX, h = s - this.lastY, l = Math.sqrt(o * o + h * h), u = n > 0 ? l / n : 0, a = t.target?.closest?.("[data-intent]"), p = a?.getAttribute("data-intent") ?? "none", g = a ? this.elementDistance(i, s, a.getBoundingClientRect()) : 0;
+      this.emit("pointer", {
+        x: i,
+        y: s,
+        velocity: Math.round(u * 1e3) / 1e3,
+        targetElement: p,
+        targetDistance: Math.round(g)
+      }), this.lastX = i, this.lastY = s, this.lastTime = e;
+    };
+  }
+  start(t) {
+    this.emit = t, this.bound = !0, document.addEventListener("mousemove", this.onMouseMove);
+  }
+  stop() {
+    this.bound && (document.removeEventListener("mousemove", this.onMouseMove), this.bound = !1), this.throttleTimer && (clearTimeout(this.throttleTimer), this.throttleTimer = null), this.emit = null;
+  }
+  elementDistance(t, e, i) {
+    const s = Math.max(i.left, Math.min(t, i.right)), n = Math.max(i.top, Math.min(e, i.bottom));
+    return Math.sqrt((t - s) ** 2 + (e - n) ** 2);
+  }
+}
+class E {
+  constructor() {
+    this.type = "scroll", this.emit = null, this.lastScrollY = 0, this.lastTime = 0, this.maxScrollY = 0, this.sectionEnterTime = 0, this.currentSection = "", this.throttleTimer = null, this.bound = !1, this.onScroll = () => {
+      if (!this.emit || this.throttleTimer) return;
+      this.throttleTimer = setTimeout(() => {
+        this.throttleTimer = null;
+      }, 200);
+      const t = performance.now(), e = typeof window < "u" ? window.scrollY : 0, i = t - this.lastTime, s = e - this.lastScrollY, n = i > 0 ? s / i : 0;
+      e > this.maxScrollY && (this.maxScrollY = e);
+      const o = this.detectSection();
+      o !== this.currentSection && (this.currentSection = o, this.sectionEnterTime = t);
+      const h = this.currentSection ? t - this.sectionEnterTime : 0;
+      this.emit("scroll", {
+        scrollY: e,
+        velocity: Math.round(n * 1e3) / 1e3,
+        section: this.currentSection,
+        sectionDwell: Math.round(h),
+        scrollDepth: this.maxScrollY
+      }), this.lastScrollY = e, this.lastTime = t;
+    };
+  }
+  start(t) {
+    this.emit = t, this.bound = !0, this.lastScrollY = typeof window < "u" ? window.scrollY : 0, this.lastTime = performance.now(), this.maxScrollY = this.lastScrollY, window.addEventListener("scroll", this.onScroll, { passive: !0 });
+  }
+  stop() {
+    this.bound && (window.removeEventListener("scroll", this.onScroll), this.bound = !1), this.throttleTimer && (clearTimeout(this.throttleTimer), this.throttleTimer = null), this.emit = null;
+  }
+  detectSection() {
+    const t = document.querySelectorAll("[data-intent]"), e = (typeof window < "u" ? window.innerHeight : 800) / 2;
+    for (const i of t) {
+      const s = i.getBoundingClientRect();
+      if (s.top <= e && s.bottom >= e)
+        return i.getAttribute("data-intent") ?? "";
+    }
+    return "";
+  }
+}
+const c = class c {
+  constructor() {
+    this.type = "click", this.emit = null, this.bound = !1, this.mouseDownTime = 0, this.mouseDownTarget = null, this.recentClicks = [], this.onMouseDown = (t) => {
+      this.mouseDownTime = performance.now(), this.mouseDownTarget = t.target;
+    }, this.onMouseUp = (t) => {
+      if (!this.emit) return;
+      const e = performance.now() - this.mouseDownTime, i = t.target, n = i?.closest?.("[data-intent]")?.getAttribute("data-intent") ?? i?.tagName?.toLowerCase() ?? "unknown", h = !(c.INTERACTIVE_TAGS.has(i?.tagName) || i?.closest?.('[role="button"], [role="link"], [tabindex]') !== null), l = performance.now(), u = { target: n, x: t.clientX, y: t.clientY, time: l };
+      this.recentClicks.push(u), this.recentClicks = this.recentClicks.filter((a) => l - a.time < 500);
+      const m = this.recentClicks.filter(
+        (a) => a.target === n && Math.abs(a.x - t.clientX) < 20 && Math.abs(a.y - t.clientY) < 20
+      ).length >= 3;
+      this.emit({
+        type: "click",
+        data: {
+          x: t.clientX,
+          y: t.clientY,
+          targetElement: n,
+          holdMs: Math.round(e),
+          approachDecel: !1,
+          rage: m,
+          dead: h
+        }
+      }), this.mouseDownTime = 0, this.mouseDownTarget = null;
+    };
+  }
+  start(t) {
+    this.emit = t, this.bound = !0, document.addEventListener("mousedown", this.onMouseDown, !0), document.addEventListener("mouseup", this.onMouseUp, !0);
+  }
+  stop() {
+    this.bound && (document.removeEventListener("mousedown", this.onMouseDown, !0), document.removeEventListener("mouseup", this.onMouseUp, !0), this.bound = !1), this.emit = null;
+  }
+};
+c.INTERACTIVE_TAGS = /* @__PURE__ */ new Set([
+  "A",
+  "BUTTON",
+  "INPUT",
+  "SELECT",
+  "TEXTAREA",
+  "LABEL",
+  "SUMMARY",
+  "DETAILS",
+  "OPTION",
+  "OPTGROUP"
+]);
+let d = c;
+class I {
+  constructor() {
+    this.type = "visibility", this.emit = null, this.observer = null, this.sections = /* @__PURE__ */ new Map();
+  }
+  start(t) {
+    this.emit = t;
+    const e = document.querySelectorAll("[data-intent]");
+    this.observer = new IntersectionObserver(
+      (i) => this.handleEntries(i),
+      { threshold: 0.5 }
+    ), e.forEach((i) => {
+      this.observer.observe(i);
+      const s = i.getAttribute("data-intent") ?? "";
+      this.sections.set(s, { enterTime: 0, totalVisibleMs: 0 });
+    });
+  }
+  stop() {
+    this.observer?.disconnect(), this.observer = null, this.emit = null, this.sections.clear();
+  }
+  handleEntries(t) {
+    if (!this.emit) return;
+    const e = performance.now();
+    for (const i of t) {
+      const s = i.target.getAttribute("data-intent") ?? "";
+      if (!s) continue;
+      const n = this.sections.get(s);
+      n && (i.isIntersecting ? (n.enterTime = e, this.emit("visibility", {
+        section: s,
+        visibleMs: n.totalVisibleMs,
+        intersectionRatio: Math.round(i.intersectionRatio * 100) / 100,
+        entered: !0
+      })) : n.enterTime > 0 && (n.totalVisibleMs += e - n.enterTime, n.enterTime = 0, this.emit("visibility", {
+        section: s,
+        visibleMs: Math.round(n.totalVisibleMs),
+        intersectionRatio: 0,
+        entered: !1
+      })));
+    }
+  }
+}
+class D {
+  constructor() {
+    this.type = "navigation", this.emit = null, this.previousUrl = "", this.originalPushState = null, this.originalReplaceState = null, this.boundPopstate = null;
+  }
+  start(t) {
+    this.emit = t, this.previousUrl = location.pathname, this.emit("navigation", {
+      from: "",
+      to: location.pathname,
+      trigger: "initial"
+    });
+    const e = this;
+    this.originalPushState = history.pushState.bind(history), history.pushState = function(...i) {
+      e.originalPushState(...i), e.onNavigate("pushState");
+    }, this.originalReplaceState = history.replaceState.bind(history), history.replaceState = function(...i) {
+      e.originalReplaceState(...i), e.onNavigate("replaceState");
+    }, this.boundPopstate = () => this.onNavigate("popstate"), window.addEventListener("popstate", this.boundPopstate);
+  }
+  stop() {
+    this.originalPushState && (history.pushState = this.originalPushState), this.originalReplaceState && (history.replaceState = this.originalReplaceState), this.boundPopstate && window.removeEventListener("popstate", this.boundPopstate), this.originalPushState = null, this.originalReplaceState = null, this.boundPopstate = null, this.emit = null;
+  }
+  onNavigate(t) {
+    if (!this.emit) return;
+    const e = location.pathname;
+    e !== this.previousUrl && (this.emit("navigation", {
+      from: this.previousUrl,
+      to: e,
+      trigger: t
+    }), this.previousUrl = e);
+  }
+}
+const f = ["pointer", "scroll", "click", "visibility", "navigation"];
+class k {
+  constructor(t = {}) {
+    this.trackers = [], this.flushTimer = null, this.boundVisibilityChange = null, this.config = {
+      endpoint: t.endpoint ?? "",
+      dev: t.dev ?? !1,
+      trackers: t.trackers ?? f,
+      sampleRate: t.sampleRate ?? 1,
+      batchSize: t.batchSize ?? 20,
+      flushInterval: t.flushInterval ?? 5e3,
+      sessionRotationMs: t.sessionRotationMs ?? 864e5,
+      respectDNT: t.respectDNT ?? !0
+    }, this.sessionManager = new b({ rotationMs: this.config.sessionRotationMs }), this.consentGate = new T({ respectDNT: this.config.respectDNT }), this.eventBus = new v(this.sessionManager.getSessionId()), this.buffer = new S({ maxSize: this.config.batchSize * 5 }), this.beacon = new w({ endpoint: this.config.endpoint || void 0 }), this.logger = new y({ enabled: this.config.dev }), this.consentGate.canTrack() && (this.initTrackers(), this.initFlush(), this.initVisibilityFlush());
+  }
+  getSessionId() {
+    return this.sessionManager.getSessionId();
+  }
+  destroy() {
+    this.flush(), this.trackers.forEach((t) => t.stop()), this.trackers = [], this.flushTimer && (clearInterval(this.flushTimer), this.flushTimer = null), this.boundVisibilityChange && (document.removeEventListener("visibilitychange", this.boundVisibilityChange), this.boundVisibilityChange = null);
+  }
+  initTrackers() {
+    const t = {
+      pointer: new M(),
+      scroll: new E(),
+      click: new d(),
+      visibility: new I(),
+      navigation: new D()
+    }, e = (i, s) => {
+      let n, o;
+      if (typeof i == "object" ? (n = i.type, o = i.data) : (n = i, o = s), n !== "click" && n !== "navigation" && Math.random() > this.config.sampleRate) return;
+      this.eventBus.emit(n, o);
+      const h = {
+        sessionId: this.sessionManager.getSessionId(),
+        timestamp: performance.now(),
+        type: n,
+        url: typeof location < "u" ? location.pathname : "",
+        data: o
+      };
+      this.buffer.push(h), this.buffer.size >= this.config.batchSize && this.flush();
+    };
+    for (const i of this.config.trackers) {
+      const s = t[i];
+      s && (s.start(e), this.trackers.push(s));
+    }
+    f.forEach((i) => {
+      this.eventBus.on(i, (s) => {
+        this.logger.send([s]);
+      });
+    });
+  }
+  initFlush() {
+    this.flushTimer = setInterval(() => this.flush(), this.config.flushInterval);
+  }
+  initVisibilityFlush() {
+    this.boundVisibilityChange = () => {
+      document.visibilityState === "hidden" && this.flush();
+    }, document.addEventListener("visibilitychange", this.boundVisibilityChange);
+  }
+  flush() {
+    const t = this.buffer.flush();
+    t.length !== 0 && (this.beacon.send(t), this.logger.send(t));
+  }
+}
+export {
+  k as IntentLayer
+};
