@@ -1,4 +1,4 @@
-export { IntentLayer } from './core/sdk'
+export { IntentLayer as default } from './core/sdk'
 export type { IntentLayerConfig, BehavioralEvent, EventType } from './core/types'
 export type {
   PointerData,

@@ -12,6 +12,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         compact: true,
+        exports: 'default',
       },
     },
     reportCompressedSize: true,

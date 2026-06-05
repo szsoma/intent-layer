@@ -349,5 +349,5 @@ class k {
   }
 }
 export {
-  k as IntentLayer
+  k as default
 };
