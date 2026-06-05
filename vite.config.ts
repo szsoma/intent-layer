@@ -16,6 +16,6 @@ export default defineConfig({
     },
     reportCompressedSize: true,
     target: 'es2020',
-    minify: 'terser',
+    minify: true,
   },
 })

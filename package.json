@@ -7,12 +7,14 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/intent-layer.js",
-      "require": "./dist/intent-layer.iife.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/intent-layer.iife.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "vite build",
     "test": "vitest run",
@@ -21,6 +23,7 @@
     "check:size": "vite build && node -e \"const{gzipSync}=require('zlib');const{readFileSync}=require('fs');const f=readFileSync('dist/intent-layer.js');const kb=gzipSync(f).length/1024;console.log('gzip:',kb.toFixed(1)+'KB');if(kb>5)process.exit(1)\""
   },
   "devDependencies": {
+    "jsdom": "^29.1.1",
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
     "vitest": "^3.0.0"
