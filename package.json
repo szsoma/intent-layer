@@ -2,13 +2,13 @@
   "name": "intent-layer",
   "version": "0.1.0",
   "type": "module",
-  "main": "./dist/intent-layer.cjs",
+  "main": "./dist/intent-layer.iife.js",
   "module": "./dist/intent-layer.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/intent-layer.js",
-      "require": "./dist/intent-layer.cjs",
+      "require": "./dist/intent-layer.iife.js",
       "types": "./dist/index.d.ts"
     }
   },
