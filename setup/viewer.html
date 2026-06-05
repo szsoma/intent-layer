@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Intent Layer — Data Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, system-ui, sans-serif; background: #0a0a0a; color: #e0e0e0; padding: 24px; }
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+    .subtitle { color: #888; font-size: 13px; margin-bottom: 24px; }
+    .config { display: flex; gap: 12px; margin-bottom: 24px; align-items: end; }
+    .config input { background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 14px; width: 320px; }
+    .config button { background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .config button:hover { background: #1d4ed8; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .stat { background: #141414; border: 1px solid #222; border-radius: 8px; padding: 16px; }
+    .stat-value { font-size: 28px; font-weight: 700; color: #60a5fa; }
+    .stat-label { font-size: 12px; color: #888; margin-top: 4px; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+    .tab { padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; background: #1a1a1a; border: 1px solid #333; }
+    .tab.active { background: #2563eb; border-color: #2563eb; }
+    .section { margin-bottom: 32px; }
+    .section h2 { font-size: 16px; margin-bottom: 12px; color: #a0a0a0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 8px 12px; border-bottom: 1px solid #333; color: #888; font-weight: 500; }
+    td { padding: 8px 12px; border-bottom: 1px solid #1a1a1a; }
+    tr:hover td { background: #111; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+    .tag-pointer { background: #1e3a5f; color: #60a5fa; }
+    .tag-scroll { background: #1e3f30; color: #4ade80; }
+    .tag-click { background: #3f2e1e; color: #fbbf24; }
+    .tag-visibility { background: #2e1e3f; color: #c084fc; }
+    .tag-navigation { background: #1e2f3f; color: #22d3ee; }
+    .tag-rage { background: #7f1d1d; color: #fca5a5; }
+    .tag-dead { background: #7f5d1d; color: #fcd34d; }
+    .empty { text-align: center; padding: 48px; color: #555; }
+    .bar-container { background: #1a1a1a; border-radius: 4px; height: 24px; overflow: hidden; position: relative; }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .bar-label { position: absolute; left: 8px; top: 4px; font-size: 11px; font-weight: 500; }
+    .bar-value { position: absolute; right: 8px; top: 4px; font-size: 11px; color: #888; }
+  </style>
+</head>
+<body>
+  <h1>Intent Layer — Data Viewer</h1>
+  <p class="subtitle">Connect to your Supabase project to view collected behavioral data</p>
+
+  <div class="config">
+    <input id="supabaseUrl" placeholder="https://your-project.supabase.co" />
+    <input id="supabaseKey" type="password" placeholder="Your service_role key" />
+    <button onclick="loadData()">Connect & Load</button>
+  </div>
+
+  <div id="content" style="display:none">
+    <div class="stats" id="stats"></div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="sessions" onclick="switchTab(this)">Sessions</div>
+      <div class="tab" data-tab="sections" onclick="switchTab(this)">Section Engagement</div>
+      <div class="tab" data-tab="ctas" onclick="switchTab(this)">CTA Interaction</div>
+      <div class="tab" data-tab="events" onclick="switchTab(this)">Raw Events</div>
+    </div>
+
+    <div id="tab-sessions" class="section"></div>
+    <div id="tab-sections" class="section" style="display:none"></div>
+    <div id="tab-ctas" class="section" style="display:none"></div>
+    <div id="tab-events" class="section" style="display:none"></div>
+  </div>
+
+  <script>
+    let baseUrl = ''
+    let headers = {}
+
+    function switchTab(el) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+      el.classList.add('active')
+      document.querySelectorAll('.section').forEach(s => s.style.display = 'none')
+      document.getElementById('tab-' + el.dataset.tab).style.display = 'block'
+    }
+
+    async function query(sql) {
+      const res = await fetch(`${baseUrl}/rest/v1/rpc/exec_sql`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ query: sql }),
+      })
+      // Fallback: query via direct REST if rpc not available
+      if (!res.ok) throw new Error(await res.text())
+      return res.json()
+    }
+
+    async function queryTable(table, select = '*', order = 'received_at.desc', limit = 1000) {
+      const res = await fetch(`${baseUrl}/rest/v1/${table}?select=${select}&order=${order}&limit=${limit}`, {
+        headers,
+      })
+      if (!res.ok) throw new Error(await res.text())
+      return res.json()
+    }
+
+    async function loadData() {
+      baseUrl = document.getElementById('supabaseUrl').value.replace(/\/$/, '')
+      const key = document.getElementById('supabaseKey').value
+      headers = {
+        'Content-Type': 'application/json',
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+      }
+
+      try {
+        // Load raw events
+        const events = await queryTable('intent_events')
+        if (!events.length) {
+          alert('Connected! No events found yet. Deploy the script on a site first.')
+          return
+        }
+
+        document.getElementById('content').style.display = 'block'
+
+        // Compute stats
+        const sessions = new Set(events.map(e => e.session_id))
+        const pages = new Set(events.map(e => e.url))
+        const clicks = events.filter(e => e.event_type === 'click')
+        const rageClicks = clicks.filter(e => e.data?.rage)
+        const deadClicks = clicks.filter(e => e.data?.dead)
+        const now = new Date()
+        const oneDayAgo = new Date(now - 86400000)
+        const todayEvents = events.filter(e => new Date(e.received_at) > oneDayAgo)
+        const todaySessions = new Set(todayEvents.map(e => e.session_id))
+
+        document.getElementById('stats').innerHTML = `
+          <div class="stat"><div class="stat-value">${sessions.size}</div><div class="stat-label">Total Sessions</div></div>
+          <div class="stat"><div class="stat-value">${todaySessions.size}</div><div class="stat-label">Sessions Today</div></div>
+          <div class="stat"><div class="stat-value">${events.length.toLocaleString()}</div><div class="stat-label">Total Events</div></div>
+          <div class="stat"><div class="stat-value">${pages.size}</div><div class="stat-label">Pages Tracked</div></div>
+          <div class="stat"><div class="stat-value">${rageClicks.length}</div><div class="stat-label">Rage Clicks</div></div>
+          <div class="stat"><div class="stat-value">${deadClicks.length}</div><div class="stat-label">Dead Clicks</div></div>
+        `
+
+        renderSessions(events)
+        renderSections(events)
+        renderCTAs(events)
+        renderEvents(events)
+
+      } catch (err) {
+        alert('Connection failed: ' + err.message)
+      }
+    }
+
+    function renderSessions(events) {
+      const bySession = {}
+      events.forEach(e => {
+        if (!bySession[e.session_id]) bySession[e.session_id] = { events: [], urls: new Set() }
+        bySession[e.session_id].events.push(e)
+        bySession[e.session_id].urls.add(e.url)
+      })
+
+      const rows = Object.entries(bySession)
+        .map(([id, s]) => ({
+          id: id.slice(0, 8) + '…',
+          first: s.events[0].received_at,
+          last: s.events[s.events.length - 1].received_at,
+          events: s.events.length,
+          pages: s.urls.size,
+          urls: [...s.urls],
+          clicks: s.events.filter(e => e.event_type === 'click').length,
+          rage: s.events.filter(e => e.event_type === 'click' && e.data?.rage).length,
+        }))
+        .sort((a, b) => new Date(b.first) - new Date(a.first))
+
+      document.getElementById('tab-sessions').innerHTML = `
+        <table>
+          <tr><th>Session</th><th>First Seen</th><th>Events</th><th>Pages</th><th>Clicks</th><th>Rage</th><th>URLs</th></tr>
+          ${rows.map(r => `
+            <tr>
+              <td><code>${r.id}</code></td>
+              <td>${new Date(r.first).toLocaleString()}</td>
+              <td>${r.events}</td>
+              <td>${r.pages}</td>
+              <td>${r.clicks}</td>
+              <td>${r.rage > 0 ? `<span class="tag tag-rage">${r.rage}</span>` : '0'}</td>
+              <td>${r.urls.join(', ')}</td>
+            </tr>
+          `).join('')}
+        </table>
+      `
+    }
+
+    function renderSections(events) {
+      const visibility = events.filter(e => e.event_type === 'visibility' && e.data?.section)
+      const bySection = {}
+      visibility.forEach(e => {
+        const s = e.data.section
+        if (!bySection[s]) bySection[s] = { views: 0, totalMs: 0 }
+        bySection[s].views++
+        if (e.data.visibleMs) bySection[s].totalMs = Math.max(bySection[s].totalMs, e.data.visibleMs)
+      })
+
+      const maxMs = Math.max(...Object.values(bySection).map(s => s.totalMs), 1)
+      const rows = Object.entries(bySection)
+        .map(([name, s]) => ({ name, ...s, avgMs: s.totalMs }))
+        .sort((a, b) => b.totalMs - a.totalMs)
+
+      const colors = ['#60a5fa', '#4ade80', '#fbbf24', '#c084fc', '#22d3ee', '#f87171', '#fb923c']
+
+      document.getElementById('tab-sections').innerHTML = `
+        <table>
+          <tr><th>Section</th><th style="width:50%">Engagement</th><th>Max Dwell</th><th>Events</th></tr>
+          ${rows.map((r, i) => `
+            <tr>
+              <td><code>${r.name}</code></td>
+              <td>
+                <div class="bar-container">
+                  <div class="bar-fill" style="width:${(r.totalMs / maxMs * 100).toFixed(1)}%;background:${colors[i % colors.length]}"></div>
+                  <span class="bar-label">${r.name}</span>
+                  <span class="bar-value">${(r.totalMs / 1000).toFixed(1)}s</span>
+                </div>
+              </td>
+              <td>${(r.totalMs / 1000).toFixed(1)}s</td>
+              <td>${r.views}</td>
+            </tr>
+          `).join('')}
+        </table>
+      `
+    }
+
+    function renderCTAs(events) {
+      const clicks = events.filter(e => e.event_type === 'click' && e.data?.targetElement && e.data.targetElement !== 'none')
+      const byCTA = {}
+      clicks.forEach(e => {
+        const c = e.data.targetElement
+        if (!byCTA[c]) byCTA[c] = { clicks: 0, rage: 0, dead: 0, holdTimes: [] }
+        byCTA[c].clicks++
+        if (e.data.rage) byCTA[c].rage++
+        if (e.data.dead) byCTA[c].dead++
+        if (e.data.holdMs) byCTA[c].holdTimes.push(e.data.holdMs)
+      })
+
+      const rows = Object.entries(byCTA)
+        .map(([name, s]) => ({
+          name,
+          ...s,
+          avgHold: s.holdTimes.length ? Math.round(s.holdTimes.reduce((a, b) => a + b, 0) / s.holdTimes.length) : 0,
+        }))
+        .sort((a, b) => b.clicks - a.clicks)
+
+      document.getElementById('tab-ctas').innerHTML = `
+        <table>
+          <tr><th>Element</th><th>Clicks</th><th>Avg Hold</th><th>Rage</th><th>Dead</th><th>Confidence</th></tr>
+          ${rows.map(r => {
+            const confidence = r.avgHold < 100 ? 'High' : r.avgHold < 200 ? 'Medium' : 'Low'
+            const confColor = confidence === 'High' ? '#4ade80' : confidence === 'Medium' ? '#fbbf24' : '#f87171'
+            return `
+              <tr>
+                <td><code>${r.name}</code></td>
+                <td>${r.clicks}</td>
+                <td>${r.avgHold}ms</td>
+                <td>${r.rage > 0 ? `<span class="tag tag-rage">${r.rage}</span>` : '0'}</td>
+                <td>${r.dead > 0 ? `<span class="tag tag-dead">${r.dead}</span>` : '0'}</td>
+                <td style="color:${confColor}">${confidence}</td>
+              </tr>
+            `
+          }).join('')}
+        </table>
+      `
+    }
+
+    function renderEvents(events) {
+      const latest = events.slice(0, 200)
+      document.getElementById('tab-events').innerHTML = `
+        <table>
+          <tr><th>Time</th><th>Type</th><th>Page</th><th>Data</th></tr>
+          ${latest.map(e => `
+            <tr>
+              <td style="white-space:nowrap">${new Date(e.received_at).toLocaleTimeString()}</td>
+              <td><span class="tag tag-${e.event_type}">${e.event_type}</span></td>
+              <td><code>${e.url}</code></td>
+              <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:12px;color:#888">
+                ${JSON.stringify(e.data)}
+              </td>
+            </tr>
+          `).join('')}
+        </table>
+      `
+    }
+  </script>
+</body>
+</html>
