@@ -23,7 +23,8 @@ export class BeaconTransport {
     const body = JSON.stringify(payload)
 
     if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-      return navigator.sendBeacon(this.endpoint, body)
+      const blob = new Blob([body], { type: 'application/json' })
+      return navigator.sendBeacon(this.endpoint, blob)
     }
 
     if (typeof fetch !== 'undefined') {

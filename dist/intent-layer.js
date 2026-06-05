@@ -55,7 +55,7 @@ class T {
     return this.respectDNT ? (typeof navigator < "u" ? navigator.doNotTrack : null) !== "1" : !0;
   }
 }
-class S {
+class w {
   constructor(t = {}) {
     this.queue = [], this.maxSize = t.maxSize ?? 100;
   }
@@ -70,7 +70,7 @@ class S {
     return this.queue.length;
   }
 }
-class w {
+class S {
   constructor(t) {
     this.endpoint = t.endpoint;
   }
@@ -82,7 +82,11 @@ class w {
       url: t[0]?.url ?? "",
       sentAt: Date.now()
     }, i = JSON.stringify(e);
-    return typeof navigator < "u" && navigator.sendBeacon ? navigator.sendBeacon(this.endpoint, i) : typeof fetch < "u" ? (fetch(this.endpoint, {
+    if (typeof navigator < "u" && navigator.sendBeacon) {
+      const s = new Blob([i], { type: "application/json" });
+      return navigator.sendBeacon(this.endpoint, s);
+    }
+    return typeof fetch < "u" ? (fetch(this.endpoint, {
       method: "POST",
       body: i,
       headers: { "Content-Type": "application/json" },
@@ -297,7 +301,7 @@ class k {
       flushInterval: t.flushInterval ?? 5e3,
       sessionRotationMs: t.sessionRotationMs ?? 864e5,
       respectDNT: t.respectDNT ?? !0
-    }, this.sessionManager = new b({ rotationMs: this.config.sessionRotationMs }), this.consentGate = new T({ respectDNT: this.config.respectDNT }), this.eventBus = new v(this.sessionManager.getSessionId()), this.buffer = new S({ maxSize: this.config.batchSize * 5 }), this.beacon = new w({ endpoint: this.config.endpoint || void 0 }), this.logger = new y({ enabled: this.config.dev }), this.consentGate.canTrack() && (this.initTrackers(), this.initFlush(), this.initVisibilityFlush());
+    }, this.sessionManager = new b({ rotationMs: this.config.sessionRotationMs }), this.consentGate = new T({ respectDNT: this.config.respectDNT }), this.eventBus = new v(this.sessionManager.getSessionId()), this.buffer = new w({ maxSize: this.config.batchSize * 5 }), this.beacon = new S({ endpoint: this.config.endpoint || void 0 }), this.logger = new y({ enabled: this.config.dev }), this.consentGate.canTrack() && (this.initTrackers(), this.initFlush(), this.initVisibilityFlush());
   }
   getSessionId() {
     return this.sessionManager.getSessionId();
