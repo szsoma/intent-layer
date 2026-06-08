@@ -12,12 +12,12 @@
 export default {
   async fetch(request, env) {
     // CORS headers — echo origin so credentials work (wildcard * fails with credentials:include)
-    const origin = request.headers.get('Origin') || '*'
+    const origin = request.headers.get('Origin')
     const corsHeaders = {
-      'Access-Control-Allow-Origin': origin,
+      ...(origin ? { 'Access-Control-Allow-Origin': origin } : {}),
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Allow-Credentials': 'true',
+      ...(origin ? { 'Access-Control-Allow-Credentials': 'true' } : {}),
     }
 
     if (request.method === 'OPTIONS') {

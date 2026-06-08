@@ -55,7 +55,7 @@ class T {
     return this.respectDNT ? (typeof navigator < "u" ? navigator.doNotTrack : null) !== "1" : !0;
   }
 }
-class w {
+class S {
   constructor(t = {}) {
     this.queue = [], this.maxSize = t.maxSize ?? 100;
   }
@@ -70,7 +70,7 @@ class w {
     return this.queue.length;
   }
 }
-class S {
+class w {
   constructor(t) {
     this.endpoint = t.endpoint;
   }
@@ -83,14 +83,15 @@ class S {
       sentAt: Date.now()
     }, i = JSON.stringify(e);
     if (typeof navigator < "u" && navigator.sendBeacon) {
-      const s = new Blob([i], { type: "application/json" });
+      const s = new Blob([i], { type: "text/plain" });
       return navigator.sendBeacon(this.endpoint, s);
     }
     return typeof fetch < "u" ? (fetch(this.endpoint, {
       method: "POST",
       body: i,
-      headers: { "Content-Type": "application/json" },
-      keepalive: !0
+      headers: { "Content-Type": "text/plain" },
+      keepalive: !0,
+      mode: "cors"
     }).catch(() => {
     }), !0) : !1;
   }
@@ -301,7 +302,7 @@ class k {
       flushInterval: t.flushInterval ?? 5e3,
       sessionRotationMs: t.sessionRotationMs ?? 864e5,
       respectDNT: t.respectDNT ?? !0
-    }, this.sessionManager = new b({ rotationMs: this.config.sessionRotationMs }), this.consentGate = new T({ respectDNT: this.config.respectDNT }), this.eventBus = new v(this.sessionManager.getSessionId()), this.buffer = new w({ maxSize: this.config.batchSize * 5 }), this.beacon = new S({ endpoint: this.config.endpoint || void 0 }), this.logger = new y({ enabled: this.config.dev }), this.consentGate.canTrack() && (this.initTrackers(), this.initFlush(), this.initVisibilityFlush());
+    }, this.sessionManager = new b({ rotationMs: this.config.sessionRotationMs }), this.consentGate = new T({ respectDNT: this.config.respectDNT }), this.eventBus = new v(this.sessionManager.getSessionId()), this.buffer = new S({ maxSize: this.config.batchSize * 5 }), this.beacon = new w({ endpoint: this.config.endpoint || void 0 }), this.logger = new y({ enabled: this.config.dev }), this.consentGate.canTrack() && (this.initTrackers(), this.initFlush(), this.initVisibilityFlush());
   }
   getSessionId() {
     return this.sessionManager.getSessionId();
@@ -319,7 +320,7 @@ class k {
     }, e = (i, s) => {
       let n, o;
       if (typeof i == "object" ? (n = i.type, o = i.data) : (n = i, o = s), n !== "click" && n !== "navigation" && Math.random() > this.config.sampleRate) return;
-      this.eventBus.emit(n, o);
+      this.eventBus.updateSession(this.sessionManager.getSessionId()), this.eventBus.emit(n, o);
       const h = {
         sessionId: this.sessionManager.getSessionId(),
         timestamp: performance.now(),

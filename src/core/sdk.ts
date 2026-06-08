@@ -98,6 +98,7 @@ export class IntentLayer {
       // Apply sampling to non-critical event types (skip click and navigation)
       if (type !== 'click' && type !== 'navigation' && Math.random() > this.config.sampleRate) return
 
+      this.eventBus.updateSession(this.sessionManager.getSessionId())
       this.eventBus.emit(type, eventData)
 
       const event: BehavioralEvent = {
