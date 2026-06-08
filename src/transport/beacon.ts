@@ -22,20 +22,19 @@ export class BeaconTransport {
     }
     const body = JSON.stringify(payload)
 
-    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-      const blob = new Blob([body], { type: 'text/plain' })
-      return navigator.sendBeacon(this.endpoint, blob)
-    }
-
     if (typeof fetch !== 'undefined') {
       fetch(this.endpoint, {
         method: 'POST',
         body,
         headers: { 'Content-Type': 'text/plain' },
         keepalive: true,
-        mode: 'cors',
       }).catch(() => {})
       return true
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+      const blob = new Blob([body], { type: 'text/plain' })
+      return navigator.sendBeacon(this.endpoint, blob)
     }
 
     return false

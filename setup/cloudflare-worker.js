@@ -28,27 +28,34 @@ export default {
       return new Response('Method not allowed', { status: 405 })
     }
 
+    let body
     try {
-      const body = await request.json()
-      const { events, sessionId, url, sentAt } = body
+      body = await request.json()
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
-      if (!events || !Array.isArray(events) || events.length === 0) {
-        return new Response(JSON.stringify({ error: 'No events' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
+    const { events, sessionId, url, sentAt } = body
 
-      // Transform events into Supabase rows
-      const rows = events.map((event) => ({
-        session_id: event.sessionId || sessionId,
-        event_type: event.type,
-        url: event.url || url,
-        data: event.data,
-        client_timestamp: event.timestamp,
-      }))
+    if (!events || !Array.isArray(events) || events.length === 0) {
+      return new Response(JSON.stringify({ error: 'No events' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
-      // Insert into Supabase
+    const rows = events.map((event) => ({
+      session_id: event.sessionId || sessionId,
+      event_type: event.type,
+      url: event.url || url,
+      data: event.data,
+      client_timestamp: event.timestamp,
+    }))
+
+    try {
       const response = await fetch(`${env.SUPABASE_URL}/rest/v1/intent_events`, {
         method: 'POST',
         headers: {
@@ -67,16 +74,16 @@ export default {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
-
-      return new Response(JSON.stringify({ ok: true, received: rows.length }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
     } catch (err) {
-      return new Response(JSON.stringify({ error: err.message }), {
-        status: 400,
+      return new Response(JSON.stringify({ error: 'Supabase connection failed', details: err.message }), {
+        status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    return new Response(JSON.stringify({ ok: true, received: rows.length }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   },
 }

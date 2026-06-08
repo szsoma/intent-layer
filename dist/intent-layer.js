@@ -82,18 +82,19 @@ class w {
       url: t[0]?.url ?? "",
       sentAt: Date.now()
     }, i = JSON.stringify(e);
+    if (typeof fetch < "u")
+      return fetch(this.endpoint, {
+        method: "POST",
+        body: i,
+        headers: { "Content-Type": "text/plain" },
+        keepalive: !0
+      }).catch(() => {
+      }), !0;
     if (typeof navigator < "u" && navigator.sendBeacon) {
       const s = new Blob([i], { type: "text/plain" });
       return navigator.sendBeacon(this.endpoint, s);
     }
-    return typeof fetch < "u" ? (fetch(this.endpoint, {
-      method: "POST",
-      body: i,
-      headers: { "Content-Type": "text/plain" },
-      keepalive: !0,
-      mode: "cors"
-    }).catch(() => {
-    }), !0) : !1;
+    return !1;
   }
 }
 class y {
