@@ -33,10 +33,10 @@ create policy "Allow anonymous inserts" on intent_events
   for insert
   with check (true);
 
--- 6. Only authenticated users (you) can read data
-create policy "Allow authenticated reads" on intent_events
+-- 6. Anyone can read data (viewer uses anon key)
+create policy "Allow anonymous reads" on intent_events
   for select
-  using (auth.role() = 'authenticated');
+  using (true);
 
 -- 7. Create a view that gives you a clean summary per session
 create view intent_sessions as
